@@ -1,4 +1,5 @@
-from meraki import meraki
+#!/usr/bin/env python3
+import meraki
 import argparse
 import sys
 import os
