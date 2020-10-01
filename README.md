@@ -1,5 +1,5 @@
 # getMerakiNeighbor
-Get CDP/LLDP neighbors from Meraki Dashboard API
+Get CDP/LLDP neighbors from Meraki Dashboard API.
 
 [![published](https://static.production.devnetcloud.com/codeexchange/assets/images/devnet-published.svg)](https://developer.cisco.com/codeexchange/github/repo/routetonull/getMerakiNeighbor)
 
@@ -9,10 +9,12 @@ More details on [IFCONFIG.IT](https://www.ifconfig.it/hugo/2019/10/get-meraki-ne
 
 Enable API access, instructions [HERE](https://documentation.meraki.com/zGeneral_Administration/Other_Topics/The_Cisco_Meraki_Dashboard_API)
 
-Install the necessary module
+Install the necessary modules
 
-	pip3 install meraki
+	 pip3 install -r requirements.txt
   
+**NOTE: I strongly advise to use [virtualenv](https://www.pythonforbeginners.com/basics/how-to-use-python-virtualenv) or other Virtual Environment tools.**
+
   ## How to
   
   Provide key from command line
@@ -75,6 +77,6 @@ Use the **--all** flag to print all the neighbors of a specific organization
 
 ### Usefult links
 
-[Meraki API](https://developer.cisco.com/meraki/)
+[Meraki API](https://developer.cisco.com/meraki/api-v1/)
 
 [Meraki API changelog](https://developer.cisco.com/meraki/whats-new/)
