@@ -4,6 +4,7 @@ attrs==20.2.0
 certifi==2020.6.20
 chardet==3.0.4
 idna==2.10
+ipdb==0.13.4
 meraki==1.1.0
 multidict==4.7.6
 requests==2.24.0
