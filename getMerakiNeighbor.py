@@ -3,7 +3,6 @@ import meraki
 import argparse
 import sys
 import os
-import ipdb
 
 """
 Read CDP/LLDP neighbors from Meraki Dashboard
