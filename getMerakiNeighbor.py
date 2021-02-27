@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 import meraki
-import argparse
 import sys
 import os
+import click
+from rich.table import Table
+from rich.console import Console
 
 """
 Read CDP/LLDP neighbors from Meraki Dashboard
@@ -18,157 +20,218 @@ Updated to Meraki API v1. Install requirements running
     pip3 install -r requirements.txt
 """
 
+def printCSV(m, deviceList, protocol: str):
+    """
+    print device neighbor in csv
+    filters per protocol if protocol is provided
+    """
+    print("PROTOCOL,LOCAL,LOCAL-PORT,REMOTE,REMOTE-PORT,REMOTE-IP")
+    for device in deviceList:
+        serial, name = (
+            device.get("serial"),
+            device.get("name", device.get("serial", "MISSING")),
+        )
+        #printNei(m, serial, name, protocol)
+        dp = m.devices.getDeviceLldpCdp(serial)
+        for port in dp.get("ports", []):
+            for proto in dp.get("ports").get(port):
+                nei = dp.get("ports").get(port).get(proto)
+                ip = nei.get("address", nei.get("managementAddress"))
+                if proto == "cdp" and protocol != "lldp":
+                    systemName = nei.get("deviceId", "noname")
+                elif proto == "lldp" and protocol != "cdp":
+                    systemName = nei.get("systemName", "noname")
+                print(
+                    f'{proto.upper()},{name},{nei.get("sourcePort")},{systemName.split(".")[0]},{nei.get("portId")},{ip}'
+                )
 
-def printNei(m, serial, name, protocol):
+
+def printRich(m, deviceList, protocol: str):
     """
     print device neighbor
     filters per protocol if protocol is provided
     """
-    dp = m.devices.getDeviceLldpCdp(serial)
-    for port in dp.get("ports", []):
-        for proto in dp.get("ports").get(port):
-            nei = dp.get("ports").get(port).get(proto)
-            ip = nei.get("address", nei.get("managementAddress"))
-            if proto == "cdp" and protocol != "lldp":
-                systemName = nei.get("deviceId", "noname")
+
+    table = Table(title="MERAKI NEIGHBORS")
+    table.add_column("PROTOCOL", style="yellow")
+    table.add_column("LOCAL", style="yellow")
+    table.add_column("LOCAL-PORT", style="yellow")
+    table.add_column("REMOTE", style="yellow")
+    table.add_column("REMOTE-PORT", style="yellow")
+    table.add_column("REMOTE-IP", style="yellow")
+
+    for device in deviceList:
+        serial, name = (
+            device.get("serial"),
+            device.get("name", device.get("serial", "MISSING")),
+        )
+
+        dp = m.devices.getDeviceLldpCdp(serial)
+        for port in dp.get("ports", []):
+            for proto in dp.get("ports").get(port):
+                nei = dp.get("ports").get(port).get(proto)
+                ip = nei.get("address", nei.get("managementAddress"))
+                if proto == "cdp" and protocol != "lldp":
+                    systemName = nei.get("deviceId", "noname")
+                elif proto == "lldp" and protocol != "cdp":
+                    systemName = nei.get("systemName", "noname")
+                table.add_row(proto,name,nei.get("sourcePort"),systemName.split(".")[0],nei.get("portId"),ip)
+    console = Console()
+    console.print(table)
+
+def printSHELL(m, deviceList, protocol: str):
+    """
+    print device neighbor
+    filters per protocol if protocol is provided
+    """
+    for device in deviceList:
+        serial, name = (
+            device.get("serial"),
+            device.get("name", device.get("serial", "MISSING")),
+        )
+        #printNei(m, serial, name, protocol)
+        dp = m.devices.getDeviceLldpCdp(serial)
+        for port in dp.get("ports", []):
+            for proto in dp.get("ports").get(port):
+                nei = dp.get("ports").get(port).get(proto)
+                ip = nei.get("address", nei.get("managementAddress"))
+                if proto == "cdp" and protocol != "lldp":
+                    systemName = nei.get("deviceId", "noname")
+                elif proto == "lldp" and protocol != "cdp":
+                    systemName = nei.get("systemName", "noname")
                 print(
                     f'{proto.upper():4} LOCAL {name[:24]:24} SOURCE-PORT {nei.get("sourcePort"):8} REMOTE DEVICE {systemName.split(".")[0][:40]:40} REMOTE PORT {nei.get("portId"):24} REMOTE IP {ip}'
                 )
-            elif proto == "lldp" and protocol != "cdp":
-                systemName = nei.get("systemName", "noname")
-                print(
-                    f'{proto.upper():4} LOCAL {name[:24]:24} SOURCE-PORT {nei.get("sourcePort"):8} REMOTE DEVICE {systemName.split(".")[0][:40]:40} REMOTE PORT {nei.get("portId"):24} REMOTE IP {ip}'
-                )
 
 
-def getIdName(objectId, objectList):
+def validate_apikey(ctx, apikey):
     """
-    find object name and ID if object exists
-    returns ID and NAME
+    Used by click to validate Meraki Dashboard API Key
     """
-    l = list(filter(lambda o: o.get("name") == objectId, objectList))
-    if not l:
-        l = list(filter(lambda o: o.get("id") == objectId, objectList))
-        if l:
-            return l[0].get("id", False), l[0].get("name", False)
-
-
-def main():
-    # getting arguments
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "-K",
-        "--apikey",
-        help="Meraki dashboard API key or set env var",
-        type=str,
-        required=False,
-    )
-    parser.add_argument(
-        "-O", "--organization", help="organization ID or NAME", type=str, required=False
-    )
-    parser.add_argument("-N", "--network", help="network", type=str, required=False)
-    parser.add_argument(
-        "-P",
-        "--protocol",
-        help="filter protocol",
-        type=str,
-        choices=["cdp", "lldp"],
-        default="",
-        required=False,
-    )
-    parser.add_argument(
-        "-A",
-        "--all",
-        help="print information for all networks in organization",
-        dest="all",
-        action="store_true",
-        default=False,
-        required=False,
-    )
-
-    args = parser.parse_args()
-    org = args.organization
-    protocol = args.protocol
-    organization = org
-    all = args.all
-
-    # verify apikey is provided
-    if args.apikey:
-        apikey = args.apikey
-    else:
-        try:
-            apikey = os.environ["apikey"]
-        except:
-            print(
-                "\nERROR: MISSING MERAKI DASHBOARD API KEY IN ARGUMENTS AND ENV VAR\n"
-            )
-            sys.exit()
-
-    # verify apikey is valid and get organizations
     try:
-        m = meraki.DashboardAPI(api_key=apikey, print_console=False, output_log=False, suppress_logging=True)
-        orgs = m.organizations.getOrganizations()
+        m = meraki.DashboardAPI(
+            api_key=apikey, print_console=False, output_log=False, suppress_logging=True
+        )
+        m.organizations.getOrganizations()
+        return apikey
     except:
-        print("\nERROR GETTING ORGANIZATIONS - VERIFY API KEY IS CORRECT\n")
-        sys.exit()
+        raise click.BadParameter("Provided API Key can't access Meraki Dashboard")
 
-    # if no organization is provided print list of organizations
-    if not args.organization:
+
+def validate_protocol(ctx, protocol: str):
+    """
+    Used by click to validate protocol
+    """
+    if protocol.upper() not in ["CDP", "LLDP", "ALL"]:
+        raise click.BadParameter("Invalid protocol")
+    else:
+        return protocol
+
+
+def validate_visualization(ctx, visualization: str):
+    """
+    Used by click to validate visualization
+    """
+    if visualization.upper() not in ["SHELL", "CSV", "RICH"]:
+        raise click.BadParameter("Invalid visualization")
+    else:
+        return visualization
+
+
+@click.command(help="""Get CDP and LLDP neighbors from Meraki Dashboard""")
+@click.option(
+    "-K",
+    "--apikey",
+    required=True,
+    prompt=True,
+    help="Meraki Dashboard API Key",
+    callback=validate_apikey,
+    default=os.environ.get("APIKEY", ""),
+)
+@click.option(
+    "-O",
+    "--orgid",
+    required=False,
+    prompt=False,
+    help="Organization ID",
+    default=os.environ.get("ORGID", ""),
+)
+@click.option(
+    "-N",
+    "--netid",
+    required=False,
+    prompt=False,
+    help="Network ID",
+    default=os.environ.get("NETID", ""),
+)
+@click.option(
+    "-P",
+    "--protocol",
+    required=False,
+    prompt=False,
+    help="Protocol [CDP,LLDP,ALL]",
+    callback=validate_protocol,
+    default=os.environ.get("PROTOCOL", "ALL"),
+)
+@click.option(
+    "-V",
+    "--visualization",
+    required=False,
+    prompt=False,
+    help="Visualization [SHELL,CSV,RICH]",
+    callback=validate_visualization,
+    default="RICH",
+)
+def getMerakiNeighbor(apikey: str, orgid: str, netid: str, protocol: str,visualization:str):
+
+    # apikei validated by click callback
+    m = meraki.DashboardAPI(
+        api_key=apikey, print_console=False, output_log=False, suppress_logging=True
+    )
+
+    # if no organization ID is provided print list of organizations
+    if not orgid:
         print("\nORGANIZATIONS AVAILABLE\n")
+        orgs = m.organizations.getOrganizations()
         for org in orgs:
             print(f"NAME: {org.get('name'):40} ID: {org.get('id'):20}")
         sys.exit()
 
-    if organization:
+    if orgid:
         try:
-            orgId, orgNname = getIdName(
-                args.organization, orgs
-            )  # verify organization exists
+            org = m.organizations.getOrganization(orgid)
+            print(f"\nFOUND ORGANIZATION {orgid} NAME {org.get('name','NOT FOUND')}\n")
         except:
-            print(f"\nERROR: ORGANIZATION {args.organization} NOT FOUND\n")
+            print(f"\nERROR: ORGANIZATION {orgid} NOT FOUND\n")
             sys.exit()
-        try:
-            network = args.network
-        except:
-            network = False
-        if orgId:
-            networks = m.organizations.getOrganizationNetworks(orgId)
-            if network:  # if network is provided print neighbors
-                try:
-                    netId, netName = getIdName(network, networks)
-                except:
-                    print(f"\nERROR: NETWORK {network} NOT FOUND\n")
-                    sys.exit()
-                if netId:  # verify network exists
-                    deviceList = m.networks.getNetworkDevices(netId)
-                    for device in deviceList:
-                        serial, name = device.get("serial"), device.get(
-                            "name", device.get("serial", "MISSING")
-                        )
-                        printNei(m, serial, name, protocol)
-            else:  # if no network is specified print network list
-                if not all:
-                    print(
-                        f'\nNETWORKS AVAILABLE FOR ORGANIZATION "{orgNname}" with ID {orgId}\n'
-                    )
-                    networks = m.organizations.getOrganizationNetworks(orgId)
-                    if isinstance(networks[0], str):
-                        print(f"ERROR GETTING NETWORKS: {networks[0]}\n")
-                        sys.exit()
-                    else:
-                        for net in networks:
-                            print(
-                                f"NETWORK: {net.get('name'):50} ID: {net.get('id'):20}"
-                            )
-                else:  # if all flag is set print neigh for all networks
-                    for net in networks:
-                        netId = net.get("id")
-                        deviceList = m.networks.getNetworkDevices(netId)
-                        for device in deviceList:
-                            serial, name = device.get("serial"), device.get(
-                                "name", device.get("serial", "MISSING")
-                            )
-                            printNei(m, serial, name, protocol)
+
+        # if netid is not provided, print network list of the organization
+        if not netid:
+            print(
+                f"\nNETWORKS AVAILABLE FOR ORGANIZATION {org.get('name')} with ID {orgid}\n"
+            )
+            networks = m.organizations.getOrganizationNetworks(orgid)
+            if isinstance(networks[0], str):
+                print(f"ERROR GETTING NETWORKS: {networks[0]}\n")
+                sys.exit()
+            else:
+                for net in networks:
+                    print(f"NETWORK: {net.get('name'):50} ID: {net.get('id'):20}")
+        else:
+            networks = m.organizations.getOrganizationNetworks(orgid)
+            try:
+                deviceList = m.networks.getNetworkDevices(netid)
+            except:
+                print(f"\nERROR: NETWORK {netid} NOT FOUND\n")
+                sys.exit()
+
+        if visualization.upper() == 'RICH':
+            printRich(m,deviceList,protocol)
+        elif visualization.upper() == 'SHELL':
+            printSHELL(m,deviceList,protocol)
+        elif visualization.upper() == 'CSV':
+            printCSV(m,deviceList,protocol)
 
 
-main()
+if __name__ == "__main__":
+    getMerakiNeighbor()
