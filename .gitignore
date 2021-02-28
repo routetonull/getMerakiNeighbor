@@ -1,4 +1,7 @@
+dist/
 venv/
 .vscode/
 *.env
 *.log
+__pycache__/
+*.pyc

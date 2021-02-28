@@ -1,0 +1,26 @@
+[tool.poetry]
+name = "getMerakiNeighbor"
+version = "0.1.1"
+description = "Get neighbors from Meraki Dashboard API"
+authors = ["Gian Paolo Boarina <gp.boarina@gmail.com>"]
+license = "MIT"
+readme = "README.md"
+homepage = "https://developer.cisco.com/codeexchange/github/repo/routetonull/getMerakiNeighbor"
+repository = "https://github.com/routetonull/getMerakiNeighbor"
+
+
+[tool.poetry.scripts]
+getMerakiNeighbor = "getmerakineighbor.getMerakiNeighbor:getMerakiNeighbor"
+
+[tool.poetry.dependencies]
+python = "^3.8"
+meraki = "^1.6.2"
+rich = "^9.12.2"
+click = "^7.1.2"
+
+[tool.poetry.dev-dependencies]
+pytest = "^6.2.2"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"

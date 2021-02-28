@@ -71,11 +71,13 @@ def printRich(m, deviceList, protocol: str):
             for proto in dp.get("ports").get(port):
                 nei = dp.get("ports").get(port).get(proto)
                 ip = nei.get("address", nei.get("managementAddress"))
-                if proto == "cdp" and protocol != "lldp":
+                
+                if proto.upper() == protocol.upper() == "CDP" or (protocol.upper() == 'ALL' and proto.upper() == 'CDP'):
                     systemName = nei.get("deviceId", "noname")
-                elif proto == "lldp" and protocol != "cdp":
+                    table.add_row(proto,name,nei.get("sourcePort"),systemName.split(".")[0],nei.get("portId"),ip)
+                elif proto.upper() == protocol.upper() == "LLDP" or (protocol.upper() == 'ALL' and proto.upper() == 'LLDP'):
                     systemName = nei.get("systemName", "noname")
-                table.add_row(proto,name,nei.get("sourcePort"),systemName.split(".")[0],nei.get("portId"),ip)
+                    table.add_row(proto,name,nei.get("sourcePort"),systemName.split(".")[0],nei.get("portId"),ip)
     console = Console()
     console.print(table)
 
@@ -95,7 +97,7 @@ def printSHELL(m, deviceList, protocol: str):
             for proto in dp.get("ports").get(port):
                 nei = dp.get("ports").get(port).get(proto)
                 ip = nei.get("address", nei.get("managementAddress"))
-                if proto == "cdp" and protocol != "lldp":
+                if proto.u == "cdp" and protocol != "lldp":
                     systemName = nei.get("deviceId", "noname")
                 elif proto == "lldp" and protocol != "cdp":
                     systemName = nei.get("systemName", "noname")
@@ -115,7 +117,7 @@ def validate_apikey(ctx, apikey):
         m.organizations.getOrganizations()
         return apikey
     except:
-        raise click.BadParameter("Provided API Key can't access Meraki Dashboard")
+        raise click.BadParameter("Provided API Key can't access Meraki Dashboard\n")
 
 
 def validate_protocol(ctx, protocol: str):
@@ -143,7 +145,8 @@ def validate_visualization(ctx, visualization: str):
     "-K",
     "--apikey",
     required=True,
-    prompt=True,
+    type=str,
+    prompt="Meraki Dashboard API Key",
     help="Meraki Dashboard API Key",
     callback=validate_apikey,
     default=os.environ.get("APIKEY", ""),
@@ -225,13 +228,12 @@ def getMerakiNeighbor(apikey: str, orgid: str, netid: str, protocol: str,visuali
                 print(f"\nERROR: NETWORK {netid} NOT FOUND\n")
                 sys.exit()
 
-        if visualization.upper() == 'RICH':
-            printRich(m,deviceList,protocol)
-        elif visualization.upper() == 'SHELL':
-            printSHELL(m,deviceList,protocol)
-        elif visualization.upper() == 'CSV':
-            printCSV(m,deviceList,protocol)
-
+            if visualization.upper() == 'RICH':
+                printRich(m,deviceList,protocol)
+            elif visualization.upper() == 'SHELL':
+                printSHELL(m,deviceList,protocol)
+            elif visualization.upper() == 'CSV':
+                printCSV(m,deviceList,protocol)
 
 if __name__ == "__main__":
     getMerakiNeighbor()

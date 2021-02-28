@@ -80,3 +80,5 @@ Use the **--all** flag to print all the neighbors of a specific organization
 [Meraki API](https://developer.cisco.com/meraki/api-v1/)
 
 [Meraki API changelog](https://developer.cisco.com/meraki/whats-new/)
+
+[Get a Merapi API Key](https://developer.cisco.com/meraki/meraki-platform/#step-1-add-the-meraki-api-key-to-the-postman-environment)
